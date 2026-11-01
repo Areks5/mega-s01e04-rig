@@ -1,6 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { DigestRow, JobStatus, NightRead, ReadNight } from './types.js';
+import type { DigestRow, JobStatus, NightRead, ReadNight, StatusCounts } from './types.js';
+
+export class NightNotFound extends Error {
+  constructor(night: string) {
+    super(`no night ${night}`);
+    this.name = 'NightNotFound';
+  }
+}
 
 const STATUSES: readonly JobStatus[] = ['ok', 'retry', 'fail'];
 
@@ -38,8 +45,11 @@ function parseLine(line: string): RawLine | null {
 }
 
 export const readNight: ReadNight = (runsDir, night) => {
-  const text = readFileSync(join(runsDir, `${night}.jsonl`), 'utf8');
+  const path = join(runsDir, `${night}.jsonl`);
+  if (!existsSync(path)) throw new NightNotFound(night);
+  const text = readFileSync(path, 'utf8');
   const byJob = new Map<string, DigestRow>();
+  const counts: StatusCounts = { ok: 0, retry: 0, fail: 0 };
   let badLines = 0;
 
   for (const line of text.split(/\r?\n/)) {
@@ -49,6 +59,7 @@ export const readNight: ReadNight = (runsDir, night) => {
       badLines += 1;
       continue;
     }
+    counts[parsed.status] += 1;
     const existing = byJob.get(parsed.job);
     if (!existing) {
       byJob.set(parsed.job, {
@@ -75,5 +86,5 @@ export const readNight: ReadNight = (runsDir, night) => {
   }
 
   const rows = [...byJob.values()].sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));
-  return { rows, badLines };
+  return { rows, badLines, counts };
 };

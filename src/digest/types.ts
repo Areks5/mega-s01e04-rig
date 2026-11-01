@@ -11,9 +11,16 @@ export type DigestRow = {
   lastAt: string;
 };
 
+export type StatusCounts = {
+  ok: number;
+  retry: number;
+  fail: number;
+};
+
 export type NightRead = {
   rows: DigestRow[];
   badLines: number;
+  counts: StatusCounts;
 };
 
 export type ReadNight = (runsDir: string, night: string) => NightRead;
